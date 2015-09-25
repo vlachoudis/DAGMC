@@ -2,22 +2,22 @@
 
 #define OUR_NAME_TAG_SIZE 128
 
-#include "MBCore.hpp"
+#include "moab/Core.hpp"
 #include "MBTagConventions.hpp"
 
-#define CHKERR(rval,msg)  if (MB_SUCCESS != rval) { std::cerr << msg << std::endl; return rval;}
-#define CHKERR1(rval,msg,data)  if (MB_SUCCESS != rval) { std::cerr << msg << data << std::endl; return rval;}
+#define CHKERR(rval,msg)  if (moab::MB_SUCCESS != rval) { std::cerr << msg << std::endl; return rval;}
+#define CHKERR1(rval,msg,data)  if (moab::MB_SUCCESS != rval) { std::cerr << msg << data << std::endl; return rval;}
 
-MBInterface *MBI() 
+moab::Interface *MBI()
 {
-    static MBCore instance;
+    static moab::Core instance;
     return &instance;
 }
 
 void help_msg()
 {
   std::cerr <<
-    "Usage: dagmc_add_density <in_filename> <volume_id> <density> <out_filename>" << std::endl << 
+    "Usage: dagmc_add_density <in_filename> <volume_id> <density> <out_filename>" << std::endl <<
     std::endl <<
     "\tin_filename   is the H5M file to load" << std::endl <<
     "\tvolume_id     is the volume for which the density will be set (integer)" << std::endl <<
@@ -26,47 +26,47 @@ void help_msg()
 }
 
 // create a meshset of all volumes to narrow GLOBAL_ID search
-MBErrorCode create_set_of_vols(MBEntityHandle& set_of_vols)
+moab::ErrorCode create_set_of_vols(moab::EntityHandle& set_of_vols)
 {
-  MBErrorCode rval;
+  moab::ErrorCode rval;
 
   // get the handle for the GEOM_DIMENSION tag
-  MBTag geom_tag;
-  rval = MBI()->tag_get_handle( GEOM_DIMENSION_TAG_NAME, 1, MB_TYPE_INTEGER, geom_tag);
+  moab::Tag geom_tag;
+  rval = MBI()->tag_get_handle( GEOM_DIMENSION_TAG_NAME, 1, moab::MB_TYPE_INTEGER, geom_tag);
   CHKERR(rval,"Failed to find GEOM_DIMENSION tag.");
 
   // use the geom dim tag to the meshsets for all entities of dimension=3
   int geom_dim = 3;
-  MBRange vols;
+  moab::Range vols;
   const void* const geom_dim_search[] = {&geom_dim};
-  rval = MBI()->get_entities_by_type_and_tag(0, MBENTITYSET, &geom_tag,
+  rval = MBI()->get_entities_by_type_and_tag(0, moab::MBENTITYSET, &geom_tag,
                                              geom_dim_search, 1, vols);
   CHKERR1(rval,"Failed to find entity sets of dimension ",geom_dim);
-    
+
   // generate a new meshset
-  rval = MBI()->create_meshset( MESHSET_SET, set_of_vols);
+  rval = MBI()->create_meshset( moab::MESHSET_SET, set_of_vols);
   CHKERR(rval,"Failed to create meshset.");
-  
+
   // insert volumes into this meshset
   rval = MBI()->add_entities(set_of_vols,vols);
   CHKERR(rval,"Failed to add volume entities to set of volumes.");
 
-  return MB_SUCCESS;
+  return moab::MB_SUCCESS;
 }
 
-MBErrorCode find_vol_with_id(MBEntityHandle set_of_vols, int find_vol_id, MBEntityHandle& vol)
+moab::ErrorCode find_vol_with_id(moab::EntityHandle set_of_vols, int find_vol_id, moab::EntityHandle& vol)
 {
-  MBErrorCode rval;
+  moab::ErrorCode rval;
 
   // get handle for querying the GLOBAL_ID
-  MBTag id_tag;
-  rval = MBI()->tag_get_handle( GLOBAL_ID_TAG_NAME, 1, MB_TYPE_INTEGER, id_tag);
+  moab::Tag id_tag;
+  rval = MBI()->tag_get_handle( GLOBAL_ID_TAG_NAME, 1, moab::MB_TYPE_INTEGER, id_tag);
   CHKERR(rval,"Failed to find GLOBAL_ID tag.");
 
   // Query the GLOBAL_ID tag to find the meshset for the volume
   const void* const vol_id_search[] = {&find_vol_id};
-  MBRange vols;
-  rval = MBI()->get_entities_by_type_and_tag( set_of_vols, MBENTITYSET, &id_tag,
+  moab::Range vols;
+  rval = MBI()->get_entities_by_type_and_tag( set_of_vols, moab::MBENTITYSET, &id_tag,
                                               vol_id_search, 1, vols);
   CHKERR(rval,"Failed to get the requested volume");
 
@@ -79,14 +79,14 @@ MBErrorCode find_vol_with_id(MBEntityHandle set_of_vols, int find_vol_id, MBEnti
 
   vol = *vols.begin();
 
-  return MB_SUCCESS;
+  return moab::MB_SUCCESS;
 
 }
 
-int main(int argc, char **argv) 
+int main(int argc, char **argv)
 {
-  MBErrorCode rval;
-  
+  moab::ErrorCode rval;
+
   if (argc < 5)
     {
       help_msg();
@@ -108,17 +108,17 @@ int main(int argc, char **argv)
 
   // create a meshset containing all the volume meshsets
   // this will narrow the search for GLOBAL_ID below
-  MBEntityHandle set_of_vols;
+  moab::EntityHandle set_of_vols;
   rval = create_set_of_vols(set_of_vols);
 
   // Find the volume in question
-  MBEntityHandle vol;
+  moab::EntityHandle vol;
   rval = find_vol_with_id(set_of_vols,find_vol_id,vol);
 
   // Create a new MOAB Tag
-  MBTag density_tag;
+  moab::Tag density_tag;
   char density_tag_name[] = "density";
-  rval = MBI()->tag_get_handle( density_tag_name, 1, MB_TYPE_DOUBLE, density_tag,
+  rval = MBI()->tag_get_handle( density_tag_name, 1, moab::MB_TYPE_DOUBLE, density_tag,
                                 moab::MB_TAG_SPARSE|moab::MB_TAG_CREAT);
   CHKERR(rval,"Failed to create density tag!");
 
@@ -131,18 +131,16 @@ int main(int argc, char **argv)
   CHKERR(rval,"Failed to get the density.");
   std::cout << "Retrieved density on volume id " << find_vol_id << " = " << check_density << std::endl;
 
-<<<<<<< HEAD
-=======
   // create new string tag
-  MBTag name_tag;
+  moab::Tag name_tag;
   char name_tag_name [OUR_NAME_TAG_SIZE] = "name\0";
 
-  rval = MBI()->tag_get_handle( name_tag_name, OUR_NAME_TAG_SIZE, MB_TYPE_OPAQUE, name_tag,
+  rval = MBI()->tag_get_handle( name_tag_name, OUR_NAME_TAG_SIZE, moab::MB_TYPE_OPAQUE, name_tag,
 				moab::MB_TAG_SPARSE|moab::MB_TAG_CREAT);
   CHKERR(rval,"Failed to create name tag");
 
   // set the value
-  char* name_tag_value = "My name is bob\0";
+  const char* name_tag_value = "My name is bob\0";
   rval = MBI()->tag_set_data(name_tag,&vol,1,&name_tag_value);
   CHKERR(rval,"Failed to set the entity name");
 
@@ -152,13 +150,11 @@ int main(int argc, char **argv)
   CHKERR(rval,"Failed to get the density.");
   std::cout << "Retrieved density on volume id " << find_vol_id << " = " << name_tag_return << std::endl;
 
-
->>>>>>> develop
   // save the mesh
   rval = MBI()->write_mesh(out_filename);
   CHKERR1(rval,"Failed to write file: ",out_filename);
 
-  return MB_SUCCESS;  
+  return moab::MB_SUCCESS;
 }
 
 
